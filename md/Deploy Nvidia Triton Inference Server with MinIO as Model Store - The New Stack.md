@@ -52,7 +52,56 @@ Create a namespace and the secret within that.
 Don’t forget to replace the credentials with your values.
 
 Now, create the deployment, service and apply them.
-
+# Create Triton deployment
+cat <<EOF > triton-deploy.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: triton
+  name: triton
+  namespace: model-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: triton
+  template:
+    metadata:
+      labels:
+        app: triton
+    spec:
+      containers:
+      - image: nvcr.io/nvidia/tritonserver:21.09-py3
+        name: tritonserver
+        command: ["/bin/bash"]
+        args: ["-c", "cp /var/run/secrets/kubernetes.io/serviceaccount/ca.crt /usr/local/share/ca-certificates && update-ca-certificates && /opt/tritonserver/bin/tritonserver --model-store=s3://https://minio.model-registry.svc.cluster.local:443/models/ --strict-model-config=false"]
+        env:
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: aws-credentials
+              key: AWS_ACCESS_KEY_ID
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: aws-credentials
+              key: AWS_SECRET_ACCESS_KEY      
+        ports:
+          - containerPort: 8000
+            name: http
+          - containerPort: 8001
+            name: grpc
+          - containerPort: 8002
+            name: metrics
+        volumeMounts:
+        - mountPath: /dev/shm
+          name: dshm
+      volumes:
+      - name: dshm
+        emptyDir:
+          medium: Memory
+EOF
 <table data-hpc="" data-tab-size="8" data-paste-markdown-skip="" data-tagsearch-lang="Shell" data-tagsearch-path="triton-minio.sh"><tbody><tr><td data-line-number="1"></td><td># Create Triton deployment</td></tr><tr><td data-line-number="2"></td><td>cat &lt;&lt;EOF &gt; triton-deploy.yaml</td></tr><tr><td data-line-number="3"></td><td>apiVersion: apps/v1</td></tr><tr><td data-line-number="4"></td><td>kind: Deployment</td></tr><tr><td data-line-number="5"></td><td>metadata:</td></tr><tr><td data-line-number="6"></td><td>labels:</td></tr><tr><td data-line-number="7"></td><td>app: triton</td></tr><tr><td data-line-number="8"></td><td>name: triton</td></tr><tr><td data-line-number="9"></td><td>namespace: model-server</td></tr><tr><td data-line-number="10"></td><td>spec:</td></tr><tr><td data-line-number="11"></td><td>replicas: 1</td></tr><tr><td data-line-number="12"></td><td>selector:</td></tr><tr><td data-line-number="13"></td><td>matchLabels:</td></tr><tr><td data-line-number="14"></td><td>app: triton</td></tr><tr><td data-line-number="15"></td><td>template:</td></tr><tr><td data-line-number="16"></td><td>metadata:</td></tr><tr><td data-line-number="17"></td><td>labels:</td></tr><tr><td data-line-number="18"></td><td>app: triton</td></tr><tr><td data-line-number="19"></td><td>spec:</td></tr><tr><td data-line-number="20"></td><td>containers:</td></tr><tr><td data-line-number="21"></td><td>- image: nvcr.io/nvidia/tritonserver:21.09-py3</td></tr><tr><td data-line-number="22"></td><td>name: tritonserver</td></tr><tr><td data-line-number="23"></td><td>command: ["/bin/bash"]</td></tr><tr><td data-line-number="24"></td><td>args: ["-c", "cp /var/run/secrets/kubernetes.io/serviceaccount/ca.crt /usr/local/share/ca-certificates &amp;&amp; update-ca-certificates &amp;&amp; /opt/tritonserver/bin/tritonserver --model-store=s3://https://minio.model-registry.svc.cluster.local:443/models/ --strict-model-config=false"]</td></tr><tr><td data-line-number="25"></td><td>env:</td></tr><tr><td data-line-number="26"></td><td>- name: AWS_ACCESS_KEY_ID</td></tr><tr><td data-line-number="27"></td><td>valueFrom:</td></tr><tr><td data-line-number="28"></td><td>secretKeyRef:</td></tr><tr><td data-line-number="29"></td><td>name: aws-credentials</td></tr><tr><td data-line-number="30"></td><td>key: AWS_ACCESS_KEY_ID</td></tr><tr><td data-line-number="31"></td><td>- name: AWS_SECRET_ACCESS_KEY</td></tr><tr><td data-line-number="32"></td><td>valueFrom:</td></tr><tr><td data-line-number="33"></td><td>secretKeyRef:</td></tr><tr><td data-line-number="34"></td><td>name: aws-credentials</td></tr><tr><td data-line-number="35"></td><td>key: AWS_SECRET_ACCESS_KEY</td></tr><tr><td data-line-number="36"></td><td>ports:</td></tr><tr><td data-line-number="37"></td><td>- containerPort: 8000</td></tr><tr><td data-line-number="38"></td><td>name: http</td></tr><tr><td data-line-number="39"></td><td>- containerPort: 8001</td></tr><tr><td data-line-number="40"></td><td>name: grpc</td></tr><tr><td data-line-number="41"></td><td>- containerPort: 8002</td></tr><tr><td data-line-number="42"></td><td>name: metrics</td></tr><tr><td data-line-number="43"></td><td>volumeMounts:</td></tr><tr><td data-line-number="44"></td><td>- mountPath: /dev/shm</td></tr><tr><td data-line-number="45"></td><td>name: dshm</td></tr><tr><td data-line-number="46"></td><td>volumes:</td></tr><tr><td data-line-number="47"></td><td>- name: dshm</td></tr><tr><td data-line-number="48"></td><td>emptyDir:</td></tr><tr><td data-line-number="49"></td><td>medium: Memory</td></tr><tr><td data-line-number="50"></td><td>EOF</td></tr></tbody></table><table data-hpc="" data-tab-size="8" data-paste-markdown-skip="" data-tagsearch-lang="Shell" data-tagsearch-path="triton-service.sh"><tbody><tr><td data-line-number="1"></td><td># Create Triton service</td></tr><tr><td data-line-number="2"></td><td>cat &lt;&lt;EOF &gt; triton-service.yaml</td></tr><tr><td data-line-number="3"></td><td>apiVersion: v1</td></tr><tr><td data-line-number="4"></td><td>kind: Service</td></tr><tr><td data-line-number="5"></td><td>metadata:</td></tr><tr><td data-line-number="6"></td><td>name: triton</td></tr><tr><td data-line-number="7"></td><td>namespace: model-server</td></tr><tr><td data-line-number="8"></td><td>spec:</td></tr><tr><td data-line-number="9"></td><td>type: NodePort</td></tr><tr><td data-line-number="10"></td><td>selector:</td></tr><tr><td data-line-number="11"></td><td>app: triton</td></tr><tr><td data-line-number="12"></td><td>ports:</td></tr><tr><td data-line-number="13"></td><td>- protocol: TCP</td></tr><tr><td data-line-number="14"></td><td>name: http</td></tr><tr><td data-line-number="15"></td><td>port: 8000</td></tr><tr><td data-line-number="16"></td><td>nodePort: 30800</td></tr><tr><td data-line-number="17"></td><td>targetPort: 8000</td></tr><tr><td data-line-number="18"></td><td>- protocol: TCP</td></tr><tr><td data-line-number="19"></td><td>name: grpc</td></tr><tr><td data-line-number="20"></td><td>port: 8001</td></tr><tr><td data-line-number="21"></td><td>nodePort: 30801</td></tr><tr><td data-line-number="22"></td><td>targetPort: 8001</td></tr><tr><td data-line-number="23"></td><td>- protocol: TCP</td></tr><tr><td data-line-number="24"></td><td>name: metrics</td></tr><tr><td data-line-number="25"></td><td>nodePort: 30802</td></tr><tr><td data-line-number="26"></td><td>port: 8002</td></tr><tr><td data-line-number="27"></td><td>targetPort: 8002</td></tr><tr><td data-line-number="28"></td><td>EOF</td></tr></tbody></table>
 
 `kubectl apply -f triton-deploy.yaml`  
